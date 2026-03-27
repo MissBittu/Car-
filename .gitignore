@@ -1,6 +1,0 @@
-*.mp4
-*.mov
-*.avi
-.env
-__pycache__/
-*.pyc

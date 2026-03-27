@@ -439,7 +439,7 @@ footer{border-top:1px solid var(--b);padding:16px 48px;display:flex;justify-cont
 
 <!-- AI ZONE -->
 <div class="ai-zone">
-  <div class="ai-chip">CLAUDE AI</div>
+  <div class="ai-chip">GROQ AI</div>
   <div class="ai-headline">
     <h3>GENERATIVE AI — THEME BUILDER</h3>
     <p>SELECT THEME · GENERATE 3–5 BUILDS · APPLY INSTANTLY TO CAR</p>
@@ -637,7 +637,7 @@ footer{border-top:1px solid var(--b);padding:16px 48px;display:flex;justify-cont
     <div class="rm-card">
       <h3>Generative AI</h3>
       <ul>
-        <li>Claude Sonnet API integration</li>
+        <li>Groq API — Llama 3.3 70B (free)</li>
         <li>5 themes: Sporty / Luxury / Stealth / Racing / Off-Road</li>
         <li>Generates 3–5 named builds per theme</li>
         <li>AI "thinking" animation while generating</li>
@@ -665,14 +665,15 @@ footer{border-top:1px solid var(--b);padding:16px 48px;display:flex;justify-cont
 
   <div class="rm-section">
     <h2>AI COMPONENT EXPLANATION</h2>
-    <p>The AI integration uses Anthropic's <strong style="color:var(--gold)">Claude Sonnet</strong> model via the <code style="color:var(--gold);font-family:var(--fM)">/v1/messages</code> REST API. A structured system prompt constrains the model to return valid JSON arrays of car configurations. Each theme input produces a distinct set of builds with unique color, wheel, accent, and a descriptive tagline.</p>
+    <p>The AI integration uses <strong style="color:var(--gold)">Groq API</strong> with the <strong style="color:var(--gold)">Llama 3.3 70B</strong> model via a local Python backend (<code style="color:var(--gold);font-family:var(--fM)">server.py</code>). A structured system prompt constrains the model to return a valid JSON array of car configurations. Each theme input produces 3 distinct named builds with unique color, wheel, accent, and a descriptive tagline.</p>
     <div class="rm-code">
-POST /v1/messages
-System: "Return exactly 3-5 car configs as JSON array. Fields: name, color, wheel, accent, desc, rationale."
-User:   "Theme: sporty. Generate builds for the Phantom Strike."
-→ Claude returns structured JSON → parsed → rendered as clickable cards → one-click applies to live car
+Browser → POST localhost:8000/generate {theme}
+       → server.py → Groq API (Llama 3.3 70B)
+       → JSON array of 3 configs
+       → rendered as clickable cards
+       → one-click applies to live car
     </div>
-    <p>If the API is unavailable (network, CORS), the system falls back to curated pre-built configurations ensuring the demo always works.</p>
+    <p>If the server is not running or the API is unavailable, the system falls back to curated pre-built configurations ensuring the demo always works.</p>
   </div>
 
   <div class="rm-section">
@@ -706,7 +707,7 @@ User:   "Theme: sporty. Generate builds for the Phantom Strike."
     <ul>
       <li>HTML5 / CSS3 / Vanilla JavaScript — zero build tools required</li>
       <li>SVG car rendering — fully procedural, driven by state</li>
-      <li>Anthropic Claude Sonnet API — generative AI layer</li>
+      <li>Groq API (Llama 3.3 70B) — generative AI layer (free)</li>
       <li>CSS Perspective 3D — garage environment</li>
       <li>Web Animations API — drag rotation, transitions</li>
       <li>Clipboard API — JSON copy functionality</li>
@@ -718,7 +719,7 @@ User:   "Theme: sporty. Generate builds for the Phantom Strike."
 <footer>
   <div class="ft">© 2026 PHANTOM AUTOMOTIVE · SOLUTIONS ENGINEER EVALUATION</div>
   <div class="ft" id="bref">PS-001-BLACK-RACING-CARBON</div>
-  <div class="ft">POWERED BY CLAUDE AI · ANTHROPIC</div>
+  <div class="ft">POWERED BY GROQ AI · LLAMA 3.3 70B</div>
 </footer>
 </main>
 
@@ -1319,17 +1320,22 @@ async function doGenerate(){
   const tint=setInterval(()=>{tt.innerHTML=THINK_MSGS[ti++%THINK_MSGS.length]+'<span class="think-dots"></span>';},700);
 
   try{
-    const resp=await fetch('/api/generate',{
+    // Calls local Python server (server.py) — which proxies to Anthropic
+    const resp=await fetch('http://localhost:8000/generate',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({theme:currentTheme})
     });
-    const cfgs=await resp.json();
+    const data=await resp.json();
+    if(!data.ok) throw new Error(data.error||'Server error');
     clearInterval(tint);thk.classList.remove('open');
-    renderAICards(cfgs);
-  }catch{
+    renderAICards(data.configs);
+  }catch(e){
     clearInterval(tint);thk.classList.remove('open');
+    // Show why it failed (only in console), use fallback configs
+    console.warn('AI server not reachable, using fallback configs.',e.message);
     renderAICards(FALLBACK[currentTheme]||FALLBACK.sporty);
+    toast('USING FALLBACK CONFIGS — start server.py for live AI');
   }
   btn.disabled=false;btn.textContent='⚡ GENERATE AI BUILDS';
 }
